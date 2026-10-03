@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b3d1f">
+<title>FOOTBALLERS — 8-Bit Gridiron</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="rotate-hint">🔄 ROTATE DEVICE TO LANDSCAPE</div>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- Title screen -->
+  <div id="title-screen" class="overlay">
+    <div class="title-logo">🏈 FOOTBALLERS</div>
+    <div class="title-sub">8-BIT GRIDIRON · v0.1</div>
+    <button id="btn-start" class="pixel-btn">KICKOFF!</button>
+    <div class="title-help">TOUCH: joystick + buttons &nbsp;·&nbsp; KEYS: WASD/Arrows, SPACE action, X switch, 1-3 pass</div>
+  </div>
+
+  <!-- Play call screen -->
+  <div id="playcall-screen" class="overlay hidden">
+    <div id="playcall-title" class="pc-title">CALL YOUR PLAY</div>
+    <div id="play-cards" class="pc-grid"></div>
+  </div>
+
+  <!-- Touch controls -->
+  <div id="touch-ui" class="hidden">
+    <div id="joy-zone"><div id="joy-base"><div id="joy-stick"></div></div></div>
+    <div id="btn-wrap">
+      <button id="btn-a" class="tbtn">SNAP</button>
+      <button id="btn-b" class="tbtn tbtn-b">SWITCH</button>
+      <div id="rcv-wrap" class="hidden">
+        <button class="tbtn tbtn-r" data-rcv="0">1</button>
+        <button class="tbtn tbtn-r" data-rcv="1">2</button>
+        <button class="tbtn tbtn-r" data-rcv="2">3</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End of game -->
+  <div id="gameover-screen" class="overlay hidden">
+    <div class="title-logo" id="final-score"></div>
+    <button id="btn-again" class="pixel-btn">REMATCH</button>
+  </div>
+</div>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
