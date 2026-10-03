@@ -1,0 +1,27 @@
+# Deploy only what the browser needs: index.html, style.css, sw.js, manifest, src/, assets/,
+# vendor/, api/. Everything below is dev-time tooling or repo noise.
+#
+# Why the list is long: Vercel uploads EVERY file it is not told to skip, and serves it as a
+# static asset. The 2026-09 security review found /jsconfig.json and /.github/workflows/ci.yml
+# answering 200 in production — harmless on their own, but a free map of the toolchain and CI
+# (info disclosure). Nothing in index.html / src/ references any of these paths (grep'd), so
+# excluding them cannot break the game. If you add a repo-level config or doc, add it here too.
+node_modules
+tools
+.claude
+*.md
+docs
+package.json
+package-lock.json
+.gitattributes
+pjrealplatformerfeel.bundle
+.github
+jsconfig.json
+types
+.mcp.json.example
+LICENSE
+SECURITY-REVIEW-WIP.md
+
+# Secrets must never be uploaded to the deployment (this is a denylist).
+.env
+.env.*

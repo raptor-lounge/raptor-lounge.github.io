@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bubble Shooter</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1>🫧 Bubble Shooter</h1>
+      <p class="tagline">Aim, fire, and pop clusters of three or more.</p>
+    </header>
+
+    <section class="hud" aria-label="Game statistics">
+      <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="score">0</span></div>
+      <div class="stat"><span class="stat-label">Shots</span><span class="stat-value" id="shots">0</span></div>
+      <div class="stat"><span class="stat-label">Best</span><span class="stat-value" id="best">0</span></div>
+    </section>
+
+    <div class="stage">
+      <canvas id="game" width="480" height="560"></canvas>
+      <p class="message" id="message">Move the mouse to aim, click to fire.</p>
+    </div>
+
+    <footer class="controls">
+      <button class="btn" id="restart">New Game</button>
+    </footer>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

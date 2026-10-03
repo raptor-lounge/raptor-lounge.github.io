@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Mobile-first, landscape platformer. viewport-fit=cover handles iPhone notch.
+         NB: no `maximum-scale`/`user-scalable=no` — disabling zoom is an accessibility failure
+         (flagged by the Vercel/Lighthouse audit). Pinch-zoom DURING play is still suppressed by
+         `touch-action: none` on <body> (style.css), so gameplay gestures aren't hijacked. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#26325c" />
+    <title>Pixel Princess Platformer</title>
+    <!-- SEO + social link previews (GitHub/WhatsApp/Twitter card). og:image must be an
+         absolute URL on the live origin; assets/ is deployed, so the screenshot resolves. -->
+    <meta
+      name="description"
+      content="A no-build browser platformer: 6 themed levels, a multi-phase boss, PWA & mobile support, with procedurally generated pixel-art and chiptune."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Pixel Princess Platformer" />
+    <meta
+      property="og:description"
+      content="A no-build browser platformer: 6 themed levels, a multi-phase boss, PWA & mobile support, with procedurally generated pixel-art and chiptune."
+    />
+    <meta property="og:url" content="https://gameforprincess.vercel.app" />
+    <meta
+      property="og:image"
+      content="https://gameforprincess.vercel.app/assets/screenshot.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://gameforprincess.vercel.app/assets/screenshot.png"
+    />
+    <!-- PWA: installable to the home screen (manifest for Android/desktop; iOS Safari
+         ignores manifest icons, so the apple-touch-icon link is required — it carries no `sizes`,
+         so any square works; tools/gen emits it at 192×192 alongside the manifest icons). -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Principessa" />
+    <link rel="icon" type="image/png" href="./assets/icons/icon-192.png" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Primary content lives in a <main> landmark (accessibility audit: a document must have
+         one main landmark). `main { display: contents }` (style.css) removes its box, so the
+         canvas keeps its exact layout — Kaplay still grabs it via querySelector("#game"). -->
+    <main id="app" aria-label="Pixel Princess Platformer">
+      <h1 class="visually-hidden">Pixel Princess Platformer</h1>
+      <!-- Kaplay renders here; it letterboxes the 16:9 canvas inside the viewport.
+           tabindex makes the canvas focusable so keyboard input keeps working after the DOM
+           "Insert Coin" overlay steals focus on respawn (see src/scenes/game.js focusCanvas). -->
+      <canvas id="game" tabindex="0"></canvas>
+    </main>
+
+    <!-- Shown only when a touch device is held in portrait (CSS-driven). -->
+    <div id="rotate-overlay">
+      <div class="rotate-inner">
+        <div class="rotate-icon">🔄</div>
+        <p data-i18n="rotate.text">Ruota il dispositivo in orizzontale</p>
+      </div>
+    </div>
+
+    <!-- On-screen controls. Shown only on touch devices (CSS @media pointer:coarse);
+         wired in src/controls.js via pointer/touch events. -->
+    <div id="touch-controls">
+      <div id="dpad">
+        <button id="btn-left" type="button" data-i18n-aria="a11y.left" aria-label="Sinistra">◀</button>
+        <button id="btn-right" type="button" data-i18n-aria="a11y.right" aria-label="Destra">▶</button>
+      </div>
+      <button id="btn-jump" type="button" data-i18n-aria="a11y.jump" aria-label="Salto">⤴</button>
+    </div>
+
+    <!-- Single audio toggle (top-right): one tap silences BOTH buses (music + effects) and the
+         glyph flips to the slashed speaker, so "off" is unmistakable. Wired in
+         src/ui/audioToggle.js; the per-bus volume sliders still live in the settings overlay. -->
+    <button id="audio-toggle" type="button" aria-label="Disattiva audio">🔊</button>
+
+    <!-- Pause button (top-left), shown only during gameplay (body.playing). Works on
+         keyboard (ESC) and touch alike; wired in src/scenes/game.js. -->
+    <button id="pause-toggle" type="button" data-i18n-aria="a11y.pause" aria-label="Pausa">⏸</button>
+
+    <!-- "Sfida un amico" (top-left, menu only — body.at-menu, where #pause-toggle is hidden).
+         A DOM button and NOT a Kaplay one on purpose: navigator.share() needs transient user
+         activation, and a Kaplay onClick runs inside the rAF loop, so iOS would reject it —
+         the very same trap as the AudioContext unlock. Wired in src/ui/shareButton.js.
+         The LABEL IS VISIBLE, not an aria-label: this is a time-attack with a global board, so
+         the board only fills up if players pass the link on — a bare 📤 circle read as
+         "some icon" and nobody pressed it. The visible text is also the accessible name now, so
+         there is no aria-label to keep in sync with it. The emoji sits in its own span because
+         the pixel font has no emoji glyphs (same reason k.text() calls with 👑 ★ pass
+         font: "sans-serif"). -->
+    <button id="share-btn" type="button">
+      <span class="share-ico" aria-hidden="true">📤</span>
+      <span class="share-label" data-i18n="share.btn">Sfida un amico</span>
+    </button>
+    <div id="share-toast" role="status" aria-live="polite" hidden data-i18n="share.copied">Link copiato!</div>
+
+    <!-- iOS-only "Add to Home" hint. iPhone Safari tabs can't go true fullscreen, so the
+         installed PWA is the way; shown + dismissed by src/ui/installHint.js. -->
+    <div id="install-hint" hidden>
+      <span class="install-text">
+        <strong data-i18n="install.title">📲 Gioca a schermo intero</strong>
+        <span data-i18n-html="install.body">Tocca <b>Condividi</b> ⬆️ in basso, poi «Aggiungi a Home»</span>
+      </span>
+      <button id="install-close" type="button" data-i18n-aria="a11y.closeHint" aria-label="Chiudi suggerimento">✕</button>
+    </div>
+
+    <!-- Pause menu overlay. DOM, not Kaplay; shown/wired by src/ui/pauseMenu.js while the
+         game scene freezes the world (k.getTreeRoot().paused). -->
+    <div id="pause-overlay" class="overlay" hidden>
+      <div class="overlay-card pause-card">
+        <p class="pause-title" data-i18n="pause.title">In pausa</p>
+        <button id="pause-resume" type="button" class="ui-btn" data-i18n="pause.resume">Riprendi</button>
+        <button id="pause-settings" type="button" class="ui-btn ghost-btn" data-i18n="pause.settings">Impostazioni</button>
+        <button id="pause-restart" type="button" class="ui-btn ghost-btn" data-i18n="pause.restart">Ricomincia il livello</button>
+        <button id="pause-menu" type="button" class="ui-btn ghost-btn" data-i18n="pause.menu">Torna al menu</button>
+      </div>
+    </div>
+
+    <!-- Settings overlay (volume sliders). DOM; shown by src/ui/settings.js from the main
+         menu and from the pause menu. Placed after #pause-overlay so it stacks above it. -->
+    <div id="settings-overlay" class="overlay" hidden>
+      <div class="overlay-card settings-card">
+        <p class="pause-title" data-i18n="settings.title">Impostazioni</p>
+        <label class="setting-row">
+          <span data-i18n="settings.music">Musica</span>
+          <input id="set-music-vol" type="range" min="0" max="100" step="1" data-i18n-aria="a11y.musicVol" aria-label="Volume musica" />
+        </label>
+        <label class="setting-row">
+          <span data-i18n="settings.sfx">Effetti</span>
+          <input id="set-sfx-vol" type="range" min="0" max="100" step="1" data-i18n-aria="a11y.sfxVol" aria-label="Volume effetti" />
+        </label>
+        <!-- Language picker. MENU ONLY (body.at-menu, style.css): canvas text is baked into the
+             Kaplay scene graph when the scene is built, so switching language re-enters the
+             scene — harmless on the menu, but from the pause menu it would drop her back at the
+             last checkpoint. Two buttons rather than a <select> so the current choice is legible
+             without opening anything. Wired in src/ui/settings.js. -->
+        <div class="setting-row lang-row">
+          <span data-i18n="settings.language">Lingua</span>
+          <div class="lang-toggle">
+            <button type="button" class="lang-btn" data-lang="it" data-i18n="lang.it">Italiano</button>
+            <button type="button" class="lang-btn" data-lang="en" data-i18n="lang.en">English</button>
+          </div>
+        </div>
+        <button id="settings-reset" type="button" class="ui-btn ghost-btn" data-i18n="settings.reset">Cancella i progressi</button>
+        <button id="settings-close" type="button" class="ui-btn" data-i18n="settings.close">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- "Insert Coin" death overlay. DOM, not Kaplay; shown by
+         src/ui/insertCoin.js when the heroine fails (with lives still left). -->
+    <div id="coin-overlay" class="overlay" hidden>
+      <div class="overlay-card coin-card">
+        <p class="coin-text" data-i18n-html="coin.text">
+          Ops! Hai sbagliato.<br />
+          Inserisci <strong>500 Coccoline</strong> per continuare.
+        </p>
+        <!-- The static half sits in its own span so painting it can never wipe the live count. -->
+        <p class="coin-lives"><span data-i18n="coin.lives">Vite rimaste:</span> <span id="coin-lives-count">3</span> ♥</p>
+        <button id="coin-btn" type="button" class="ui-btn" data-i18n="coin.btn">Inserisci Coin</button>
+      </div>
+    </div>
+
+    <!-- Game Over overlay: shown by src/ui/gameOver.js when the last life is lost. The run
+         restarts from level 1 (score wiped); the Coccoline tab deliberately keeps growing. -->
+    <div id="gameover-overlay" class="overlay" hidden>
+      <div class="overlay-card gameover-card">
+        <p class="gameover-title" data-i18n="gameover.title">Game Over</p>
+        <p class="coin-text" data-i18n-html="gameover.text">
+          Hai esaurito le vite!<br />
+          La principessa ricomincia il viaggio dall'inizio.<br />
+          <span class="gameover-note">(Le Coccoline restano sul conto 😉)</span>
+        </p>
+        <button id="gameover-btn" type="button" class="ui-btn" data-i18n="gameover.btn">Ricomincia da capo</button>
+      </div>
+    </div>
+
+    <!-- Finale receipt + WhatsApp payoff. Filled by src/ui/receipt.js. -->
+    <div id="receipt-overlay" class="overlay" hidden>
+      <div class="overlay-card receipt-card">
+        <div class="receipt-head" data-i18n="receipt.head">SCONTRINO</div>
+        <div class="receipt-sub" data-i18n="receipt.sub">Principessa Perfetta S.p.A.</div>
+        <div class="receipt-rule"></div>
+        <p class="receipt-line" data-i18n="receipt.cost">Costo di questa avventura:</p>
+        <!-- Every line that hosts a live <span> keeps its static words in a span of their own:
+             writing textContent on the parent would delete the amount. -->
+        <p class="receipt-total"><span id="receipt-amount">0</span> <span data-i18n="receipt.currency">Coccoline</span></p>
+        <p class="receipt-line"><span data-i18n="receipt.lifetime">Totale storico:</span> <span id="receipt-lifetime">0</span> <span data-i18n="receipt.currency">Coccoline</span></p>
+        <p class="receipt-line"><span data-i18n="receipt.time">Tempo di gioco:</span> <span id="receipt-time">0:00</span></p>
+        <div class="receipt-rule"></div>
+        <p class="receipt-foot" data-i18n="receipt.foot">Grazie per aver giocato ❤️</p>
+        <button id="receipt-pay" type="button" class="ui-btn pay-btn" data-i18n="receipt.pay">Paga il Debito!</button>
+        <button id="receipt-close" type="button" class="ui-btn ghost-btn" data-i18n="receipt.close">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- Global leaderboard overlay. DOM; shown by src/ui/leaderboard.js — submit mode from the
+         finale (where #lb-invite turns it into the closing "enter the board" step), read-only
+         standings from the menu. Talks to /api/leaderboard (Vercel). Every finished run is its own
+         row, so the list is paged (#lb-pager). -->
+    <div id="leaderboard-overlay" class="overlay" hidden>
+      <div class="overlay-card leaderboard-card">
+        <p class="pause-title" data-i18n="lb.title">Classifica</p>
+        <div id="lb-form">
+          <p id="lb-invite" class="lb-invite" data-i18n-html="lb.invite" hidden>
+            🏆 Hai finito il viaggio!<br />Metti il tuo tempo in classifica
+          </p>
+          <p class="lb-prompt"><span data-i18n="lb.yourScore">Il tuo punteggio:</span> <span id="lb-score">0</span> ★</p>
+          <p class="lb-prompt"><span data-i18n="lb.yourTime">Il tuo tempo:</span> <span id="lb-time">0:00</span> ⏱</p>
+          <input
+            id="nickname-input"
+            type="text"
+            maxlength="16"
+            data-i18n-placeholder="lb.namePlaceholder"
+            placeholder="Il tuo nome"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          <button id="lb-submit" type="button" class="ui-btn" data-i18n="lb.submit">Invia in classifica</button>
+        </div>
+        <ol id="lb-list" class="lb-list"></ol>
+        <div id="lb-pager" class="lb-pager" hidden>
+          <button id="lb-prev" type="button" class="lb-page-btn" data-i18n="lb.prev" data-i18n-aria="a11y.prevPage" aria-label="Pagina precedente">‹ Prec</button>
+          <span id="lb-range" class="lb-range"></span>
+          <button id="lb-next" type="button" class="lb-page-btn" data-i18n="lb.next" data-i18n-aria="a11y.nextPage" aria-label="Pagina successiva">Succ ›</button>
+        </div>
+        <p id="lb-status" class="lb-status"></p>
+        <button id="lb-close" type="button" class="ui-btn ghost-btn">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- Scene-transition fade. Purely visual; pointer-none. -->
+    <div id="fade"></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

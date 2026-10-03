@@ -1,0 +1,31 @@
+{
+  "name": "pixel-princess-platformer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Personalized 2D platformer (Kaplay, no build step). This package.json exists ONLY for the dev-time browser test harness; the game itself loads vendored Kaplay and needs no install/build.",
+  "license": "MIT",
+  "author": "Vito D'Elia",
+  "homepage": "https://gameforprincess.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VTvito/pixel-princess-platformer.git"
+  },
+  "scripts": {
+    "serve": "python tools/serve.py 8137",
+    "gen": "node tools/gen/index.mjs",
+    "test": "node tools/test/api.mjs && node tools/test/serve.mjs && node tools/test/smoke.mjs && node tools/test/features.mjs && node tools/test/levels.mjs && node tools/test/boss.mjs && node tools/test/i18n.mjs",
+    "test:api": "node tools/test/api.mjs",
+    "test:serve": "node tools/test/serve.mjs",
+    "test:smoke": "node tools/test/smoke.mjs",
+    "test:features": "node tools/test/features.mjs",
+    "test:levels": "node tools/test/levels.mjs",
+    "test:boss": "node tools/test/boss.mjs",
+    "test:i18n": "node tools/test/i18n.mjs",
+    "test:mobile": "node tools/test/mobile.mjs",
+    "deploy": "node tools/deploy.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.60.0"
+  }
+}

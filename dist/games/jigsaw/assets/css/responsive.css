@@ -1,0 +1,74 @@
+/* ==========================================================================
+   assets/css/responsive.css - Media Queries & Mobile / Tablet Breakpoints
+   PlayJigsaw.net Open Source Game Engine (https://playjigsaw.net/)
+   ========================================================================== */
+
+@media (max-width: 992px) {
+  .app-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .canvas-wrapper {
+    height: 480px;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .game-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    justify-content: stretch;
+  }
+
+  .toolbar-actions .btn {
+    flex: 1;
+  }
+
+  .game-status-bar {
+    gap: 1.25rem;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .canvas-wrapper {
+    height: 400px;
+  }
+
+  .article-container {
+    padding: 1.75rem;
+  }
+
+  .modal-dialog {
+    padding: 1.75rem;
+  }
+
+  .modal-stats {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-title {
+    font-size: 1.1rem;
+  }
+
+  .canvas-wrapper {
+    height: 320px;
+  }
+
+  .cta-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

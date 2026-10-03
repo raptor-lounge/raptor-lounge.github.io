@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Jigsaw Puzzles Free Online - HTML5 Canvas Puzzle Game</title>
+  <meta name="description" content="Play free online jigsaw puzzles directly in your browser. Choose custom piece cuts, difficulty levels, and beautiful HD images. Powered by PlayJigsaw.net.">
+  <meta name="keywords" content="jigsaw puzzles free online, free online jigsaw puzzles, play jigsaw, puzzle games, browser jigsaw, html5 puzzle game">
+  <link rel="canonical" href="https://playjigsaw.net/">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
+  
+  <!-- Open Graph / Meta -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Play Jigsaw Puzzles Free Online - HTML5 Engine">
+  <meta property="og:description" content="Interactive, free online jigsaw puzzle web game with piece snapping, custom piece counts, and HD themes.">
+  <meta property="og:url" content="https://playjigsaw.net/">
+
+  <!-- Modular Stylesheets -->
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand-logo">
+          <span class="logo-icon">🧩</span>
+          <div class="brand-text">
+            <span class="brand-name">PlayJigsaw</span>
+            <span class="brand-badge">Open Source Engine</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-center">
+        <h1 class="main-title">Jigsaw Puzzles Free Online</h1>
+      </div>
+      <div class="header-right">
+        <a href="https://playjigsaw.net/" target="_blank" rel="noopener" class="btn btn-primary btn-pulse" title="Visit PlayJigsaw.net for 10,000+ HD Puzzles">
+          <span>Explore 10,000+ Puzzles</span>
+          <svg class="external-icon" viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z" clip-rule="evenodd"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Game Section -->
+    <main class="game-container">
+      <!-- Toolbar -->
+      <section class="game-toolbar" aria-label="Game Controls">
+        <div class="toolbar-group">
+          <label for="puzzle-select" class="toolbar-label">Theme:</label>
+          <select id="puzzle-select" class="select-input">
+            <option value="nature">🏔️ Alpine Mountain Lake</option>
+            <option value="sunset">🌅 Golden Sunset Beach</option>
+            <option value="aurora">🌌 Northern Lights</option>
+            <option value="castle">🏰 Fairytale Castle</option>
+            <option value="cats">🐱 Playful Kittens</option>
+            <option value="custom">📁 Custom Image...</option>
+          </select>
+          <input type="file" id="custom-image-input" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="toolbar-group">
+          <label for="difficulty-select" class="toolbar-label">Pieces:</label>
+          <select id="difficulty-select" class="select-input">
+            <option value="6">6 pieces (Easy 2×3)</option>
+            <option value="12" selected>12 pieces (Casual 3×4)</option>
+            <option value="24">24 pieces (Medium 4×6)</option>
+            <option value="48">48 pieces (Hard 6×8)</option>
+          </select>
+        </div>
+
+        <div class="toolbar-actions">
+          <button id="btn-shuffle" class="btn btn-secondary" title="Shuffle pieces & restart">
+            🔄 <span>New Game</span>
+          </button>
+          <button id="btn-preview" class="btn btn-secondary" title="Toggle reference preview image">
+            🖼️ <span>Preview</span>
+          </button>
+          <button id="btn-ghost" class="btn btn-secondary" title="Toggle faint background guide">
+            👻 <span>Ghost</span>
+          </button>
+          <button id="btn-hint" class="btn btn-secondary" title="Auto-place a random piece">
+            💡 <span>Hint</span>
+          </button>
+          <button id="btn-sound" class="btn btn-icon" title="Toggle sound effects">
+            🔊
+          </button>
+        </div>
+      </section>
+
+      <!-- Status Bar -->
+      <div class="game-status-bar">
+        <div class="status-item">
+          <span class="status-icon">⏱️</span>
+          <span class="status-title">Time:</span>
+          <span id="timer-display" class="status-value">00:00</span>
+        </div>
+        <div class="status-item">
+          <span class="status-icon">🧩</span>
+          <span class="status-title">Progress:</span>
+          <span id="progress-display" class="status-value">0 / 12</span>
+        </div>
+        <div class="status-item">
+          <span class="status-icon">🎯</span>
+          <span class="status-title">Moves:</span>
+          <span id="moves-display" class="status-value">0</span>
+        </div>
+      </div>
+
+      <!-- Canvas Board Arena -->
+      <div class="canvas-wrapper" id="canvas-wrapper">
+        <canvas id="puzzle-canvas"></canvas>
+
+        <!-- Reference Preview Overlay Popup -->
+        <div class="preview-popup" id="preview-popup">
+          <div class="preview-header">
+            <span>Reference Image</span>
+            <button id="btn-close-preview" class="btn-close">&times;</button>
+          </div>
+          <img id="preview-img" src="" alt="Jigsaw puzzle reference picture">
+        </div>
+      </div>
+    </main>
+
+    <!-- SEO & Entity Information Article Section -->
+    <section class="seo-article-section">
+      <div class="article-container">
+        <h2>Play Free Jigsaw Puzzles Online &mdash; Clean, Relaxing, Brain-Boosting Fun</h2>
+        <p>
+          Welcome to the open-source client for <a href="https://playjigsaw.net/" class="seo-link" target="_blank" rel="noopener">PlayJigsaw.net</a>, the premier destination for high-definition <strong>jigsaw puzzles free online</strong>. Whether you are unwinding after a long work day, sharpening your cognitive focus, or enjoying a mindful weekend break, solving digital jigsaw puzzles in your browser offers instant gratification with zero downloads, zero popups, and full cross-device compatibility.
+        </p>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="card-icon">✨</div>
+            <h3>Realistic Canvas Physics</h3>
+            <p>Engineered with smooth Bézier curve interlocking tabs and automatic snap-lock detection for a truly authentic tactile jigsaw feel.</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">🎯</div>
+            <h3>Multi-Level Difficulty</h3>
+            <p>From quick 6-piece brain teasers to demanding 48+ piece challenges suitable for both children and seasoned puzzle masters.</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">🧠</div>
+            <h3>Cognitive Benefits</h3>
+            <p>Scientific studies show that daily puzzle solving enhances spatial reasoning, short-term memory, dopamine production, and mental agility.</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">🌐</div>
+            <h3>100% Free & Browser-Native</h3>
+            <p>Built with pure HTML5 Canvas & Vanilla JS. Play seamlessly on Desktop, iPad, Tablet, and Mobile with responsive touch support.</p>
+          </div>
+        </div>
+
+        <div class="cta-banner">
+          <div class="cta-text">
+            <h3>Craving more categories, daily challenges, and multiplayer rooms?</h3>
+            <p>Visit <a href="https://playjigsaw.net/" target="_blank" rel="noopener">PlayJigsaw.net</a> to explore over 10,000+ curated HD jigsaw puzzles across Nature, Animals, Art, Architecture, Space, and Fantasy.</p>
+          </div>
+          <a href="https://playjigsaw.net/" target="_blank" rel="noopener" class="btn btn-cta">
+            Play at PlayJigsaw.net &rarr;
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-col">
+          <div class="brand-logo">
+            <span class="logo-icon">🧩</span>
+            <span class="brand-name">PlayJigsaw.net</span>
+          </div>
+          <p class="footer-desc">Your ultimate hub for <a href="https://playjigsaw.net/">jigsaw puzzles free online</a>. Designed for puzzle enthusiasts of all ages.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Explore PlayJigsaw</h4>
+          <ul class="footer-links">
+            <li><a href="https://playjigsaw.net/" target="_blank" rel="noopener">Daily Free Jigsaw Puzzles</a></li>
+            <li><a href="https://playjigsaw.net/" target="_blank" rel="noopener">Nature & Landscape Puzzles</a></li>
+            <li><a href="https://playjigsaw.net/" target="_blank" rel="noopener">Animals & Wildlife Puzzles</a></li>
+            <li><a href="https://playjigsaw.net/" target="_blank" rel="noopener">Famous Art & Paintings</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Open Source</h4>
+          <ul class="footer-links">
+            <li><a href="https://github.com/playjigsaw/play-jigsaw-puzzles-online" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="docs/API.md">API Documentation</a></li>
+            <li><a href="docs/ALGORITHM.md">Bézier Geometry Engine</a></li>
+            <li><a href="CONTRIBUTING.md">Contributing Guide</a></li>
+            <li><a href="LICENSE">MIT License</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 <a href="https://playjigsaw.net/">PlayJigsaw.net</a>. All rights reserved. Open-source under MIT License.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Victory Modal -->
+  <div class="modal-backdrop" id="victory-modal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <span class="trophy-emoji">🏆</span>
+        <h2>Puzzle Completed!</h2>
+        <p class="modal-subtitle">Outstanding job! You solved the puzzle with great precision.</p>
+      </div>
+      <div class="modal-stats">
+        <div class="stat-box">
+          <span class="stat-label">Completion Time</span>
+          <span class="stat-number" id="win-time">01:45</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Total Moves</span>
+          <span class="stat-number" id="win-moves">18</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Pieces Assembled</span>
+          <span class="stat-number" id="win-pieces">12 / 12</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-play-again" class="btn btn-secondary">Play Another Puzzle</button>
+        <a href="https://playjigsaw.net/" target="_blank" rel="noopener" class="btn btn-primary">
+          Play 10,000+ More on PlayJigsaw.net &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modular ES6 Application Entry Point -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

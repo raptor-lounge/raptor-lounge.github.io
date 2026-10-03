@@ -1,0 +1,871 @@
+/* Full-bleed canvas with letterbox background. Kaplay scales the 16:9 game canvas to
+   fit the viewport (letterbox: true), keeping aspect ratio; the body color shows in the
+   bars. */
+
+/* Pixel UI font (same file Kaplay loads as "pixel" — see src/assets.js). Used for the DOM
+   overlays so the HTML UI matches the pixel-art canvas. CSS falls back per-glyph to the
+   system font, so emoji in these elements (📲 🎵 🔊 ❤️) still render in colour. */
+@font-face {
+  font-family: "PixelifySans";
+  src: url("assets/fonts/PixelifySans.woff2") format("woff2");
+  font-display: swap;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  /* Track the *actually visible* viewport. On iOS Safari `100%`/`100vh` resolve against the
+     large viewport (as if the toolbars were hidden), so the letterboxed 16:9 canvas was
+     centred in a box taller than the screen and its top edge slipped under the status/URL
+     bar. `100dvh` follows the live visible height, so the game fits without that clip. */
+  height: 100vh; /* fallback for browsers without dvh */
+  height: 100dvh;
+  overflow: hidden;
+  background: #26325c; /* deep blue letterbox bars */
+  /* Disable touch gestures (scroll/zoom) that would interfere with game controls. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The <main> landmark wraps the canvas purely for accessibility. It MUST be a real box that
+   fills the viewport — NOT `display: contents`. Kaplay sizes its canvas/backbuffer from the
+   canvas's PARENT element dimensions; a `display: contents` wrapper generates no box (0×0), so
+   Kaplay read 0 and set a 0×0 backbuffer → blank screen on desktop (the menu never drew). A real
+   block sized to the live viewport (`100dvh` tracks iOS's visible height, preserving the no-clip
+   fix) gives the parent definite dimensions, and #game's height:100% resolves against it. */
+main#app {
+  display: block;
+  width: 100vw;
+  height: 100vh; /* fallback for browsers without dvh */
+  height: 100dvh;
+}
+
+/* Off-screen but exposed to assistive tech — for the document <h1> inside <main>. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%; /* resolves against main#app, which is a real 100dvh box (see its rule above) */
+  outline: none; /* focusable (tabindex) for keyboard, but no focus ring around the canvas */
+}
+
+/* --- Rotate-device overlay --------------------------------------------------
+   Only relevant on touch devices (coarse pointer) held in portrait. On desktop
+   (fine pointer) it stays hidden regardless of window proportions. */
+#rotate-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #26325c;
+  color: #fff8f0;
+  font-family: "PixelifySans", sans-serif;
+  text-align: center;
+  z-index: 50; /* portrait warning stays above the gameplay modals + fade */
+}
+
+.rotate-inner {
+  padding: 24px;
+}
+
+.rotate-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: rotate-hint 1.6s ease-in-out infinite;
+}
+
+.rotate-inner p {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+@keyframes rotate-hint {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-overlay {
+    display: flex;
+  }
+}
+
+/* --- On-screen touch controls ----------------------------------------------
+   A full-viewport, click-through layer; only the buttons capture input. Hidden by
+   default and revealed only DURING GAMEPLAY (body.playing) on coarse-pointer (touch)
+   devices — so they never cover the menu's character cards. Offsets respect the iOS
+   safe area (notch / home indicator) so nothing falls off-screen in landscape. */
+#touch-controls {
+  position: fixed;
+  inset: 0;
+  display: none;
+  pointer-events: none; /* layer is transparent to input… */
+  z-index: 5; /* above canvas, below the portrait rotate-overlay */
+}
+
+/* Shared look for every touch button: translucent at rest (unobtrusive over the art),
+   solid gold while pressed (.is-active is toggled in src/controls.js). */
+#touch-controls button {
+  pointer-events: auto; /* …but the buttons themselves are tappable */
+  position: absolute;
+  border: 1.5px solid rgba(255, 248, 240, 0.5); /* soft light edge → reads on any backdrop */
+  color: #fff8f0;
+  background: rgba(38, 50, 92, 0.32); /* deep blue, mostly transparent at rest */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+  font-size: 34px;
+  line-height: 1;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.08s ease, transform 0.08s ease, opacity 0.12s ease;
+}
+#touch-controls button.is-active {
+  background: rgba(212, 175, 55, 0.85); /* gold while pressed */
+  border-color: rgba(212, 175, 55, 0.9);
+  color: #26325c;
+  transform: scale(0.94);
+}
+
+/* Direction pad: a single slim horizontal pill, bottom-left, holding the two halves. */
+#dpad {
+  position: absolute;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  left: calc(22px + env(safe-area-inset-left, 0px));
+  display: flex;
+  pointer-events: none; /* the container is inert; its buttons capture input */
+}
+#dpad button {
+  position: static; /* flow inside the pill instead of absolute corners */
+  width: 76px;
+  height: 66px;
+  opacity: 0.9;
+}
+#btn-left {
+  border-radius: 36px 6px 6px 36px; /* rounded outer (left) edge, flat inner seam */
+  border-right-width: 0.75px;
+}
+#btn-right {
+  border-radius: 6px 36px 36px 6px; /* rounded outer (right) edge, flat inner seam */
+  border-left-width: 0.75px;
+}
+
+/* Jump: the primary action — a larger circle, bottom-right, with a warm gold accent. */
+#btn-jump {
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  right: calc(22px + env(safe-area-inset-right, 0px));
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  font-size: 40px;
+  background: rgba(212, 175, 55, 0.26); /* hint of gold so it reads as "the action" */
+}
+
+@media (pointer: coarse) {
+  body.playing #touch-controls {
+    display: block;
+  }
+}
+
+/* --- Audio toggle ------------------------------------------------
+   ONE top-right circular button that mutes/unmutes both buses at once (music + effects), same
+   translucent style as the touch controls and mirror of #pause-toggle on the left. It replaced a
+   pair of buttons (🎵 + 🔊) whose "off" state was a mere `opacity: 0.4` — too easy to misread.
+   Now "off" is loud: the glyph itself becomes the slashed speaker 🔇 (src/ui/audioToggle.js) AND
+   the circle turns crimson, so the state reads at a glance without relying on transparency. */
+#audio-toggle {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px)); /* clear the iOS status bar / notch */
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: #fff8f0;
+  background: rgba(38, 50, 92, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 8; /* above the canvas + touch layer, below the modals */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+#audio-toggle:hover {
+  background: rgba(38, 50, 92, 0.75);
+}
+#audio-toggle:active {
+  transform: scale(0.92);
+}
+#audio-toggle.is-muted {
+  background: rgba(150, 44, 64, 0.72); /* crimson — "no audio", not just a dimmer button */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 0 0 2px rgba(255, 170, 180, 0.65);
+}
+#audio-toggle.is-muted:hover {
+  background: rgba(150, 44, 64, 0.9);
+}
+
+/* --- Pause button (top-left) ------------------------------------------------
+   Same circular style as the audio toggles, mirrored to the left. Shown only during
+   gameplay (body.playing); the in-canvas HUD name/level are nudged right to clear it. */
+#pause-toggle {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #fff8f0;
+  background: rgba(38, 50, 92, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 8; /* above canvas + touch layer, below the modals */
+  display: none; /* revealed only during gameplay */
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+body.playing #pause-toggle {
+  display: flex;
+}
+#pause-toggle:hover {
+  background: rgba(38, 50, 92, 0.75);
+}
+#pause-toggle:active {
+  transform: scale(0.92);
+}
+
+/* --- Share button (top-left, menu only) -------------------------------------
+   Keeps the colours, shadow, z-index and press feedback of the audio/pause toggles — same
+   chrome family — but it is a PILL, not a circle: the label rides along with the icon. A bare
+   📤 circle carried its meaning only in an aria-label, i.e. nowhere for a sighted player,
+   and this button is what makes the global board fill up. The label therefore never collapses
+   back to an icon, not even on the smallest screen (see the max-height override below).
+   It lives in the top-left because the top-right is the audio toggle and #pause-toggle is hidden
+   off the menu, so the corner is free exactly when this is on screen — never both at once. */
+#share-btn {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  width: auto; /* grows with the label — and it grows again once translated */
+  height: 48px;
+  padding: 0 18px 0 14px;
+  gap: 9px;
+  border: none;
+  border-radius: 24px; /* = height/2 → a pill at any width */
+  font-family: "PixelifySans", monospace;
+  font-size: 17px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  color: #fff8f0;
+  background: rgba(38, 50, 92, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 8; /* above canvas + touch layer, below the modals */
+  display: none; /* revealed only on the menu */
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+/* The emoji keeps its own box so it renders from the system emoji font at its own size: the
+   pixel font has no 📤 glyph, and letting it inherit 17px made it a tiny smudge. */
+.share-ico {
+  font-family: sans-serif;
+  font-size: 20px;
+  line-height: 1;
+}
+body.at-menu #share-btn {
+  display: flex;
+}
+#share-btn:hover {
+  background: rgba(38, 50, 92, 0.75);
+}
+#share-btn:active {
+  transform: scale(0.92);
+}
+
+/* Landscape phones are ~430px tall and the top-left corner is tight. Shrink the pill — never
+   hide the label, which is the entire point of the change; the toast follows it up. */
+@media (max-height: 560px) {
+  #share-btn {
+    height: 42px;
+    padding: 0 13px 0 10px;
+    gap: 7px;
+    font-size: 14px;
+    border-radius: 21px;
+  }
+  .share-ico {
+    font-size: 17px;
+  }
+}
+
+/* Confirmation pill under the button: the clipboard fallback is silent otherwise, and a copy
+   you can't see is a copy you don't trust. Never interactive — it must not eat the next tap. */
+#share-toast {
+  position: fixed;
+  top: calc(72px + env(safe-area-inset-top, 0px)); /* 16 top + 48 pill + 8 gap */
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  max-width: 210px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #fff8f0;
+  color: #26325c;
+  font-family: "PixelifySans", monospace;
+  font-size: 15px;
+  line-height: 1.25;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+#share-toast.is-visible {
+  opacity: 1;
+}
+/* Follows the shrunken pill down. Must sit AFTER the base rule above: same specificity, so the
+   later declaration is the one that wins — inside the pill's own media block it would lose. */
+@media (max-height: 560px) {
+  #share-toast {
+    top: calc(66px + env(safe-area-inset-top, 0px)); /* 16 + 42 + 8 */
+  }
+}
+
+/* Pause card: a heading + a column of full-width buttons. */
+.pause-title {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.pause-card .ui-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Settings card: labelled volume sliders + a full-width close button. */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  font-size: 18px;
+}
+.setting-row span {
+  flex: none;
+  min-width: 96px;
+  text-align: left;
+}
+.setting-row input[type="range"] {
+  flex: 1;
+  accent-color: #d4af37; /* royal gold to match the buttons */
+  height: 6px;
+  cursor: pointer;
+}
+.settings-card .ui-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+}
+
+/* --- Language row (settings) -------------------------------------------------
+   MENU ONLY. Kaplay text is baked into the scene graph when a scene is built, so a language
+   switch has to re-enter the scene: fine on the menu, but from the pause menu it would rebuild
+   the level and dump her back at the last checkpoint. Same body-class gating as #share-btn and
+   #pause-toggle. Two buttons instead of a <select>: the active language is readable without
+   opening anything, which is the whole point of putting it here. */
+.lang-row {
+  display: none;
+}
+body.at-menu .lang-row {
+  display: flex;
+}
+.lang-toggle {
+  display: flex;
+  gap: 8px;
+}
+.lang-btn {
+  padding: 7px 14px;
+  font-family: "PixelifySans", sans-serif;
+  font-size: 16px;
+  color: #26325c;
+  background: rgba(38, 50, 92, 0.08);
+  border: 1px solid rgba(38, 50, 92, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.12s ease;
+}
+.lang-btn:hover:not(.is-active) {
+  background: rgba(212, 175, 55, 0.25);
+}
+/* The active language is a SOLID gold fill, not a tint: at a glance you must know which one
+   you are reading, especially when the interface is in a language you don't. */
+.lang-btn.is-active {
+  background: #d4af37;
+  border-color: #d4af37;
+  font-weight: 700;
+  cursor: default;
+}
+/* Destructive "Cancella i progressi" while armed (second tap confirms). */
+.ui-btn.danger-armed {
+  background: #c2410c; /* warm warning orange */
+  color: #fff8f0;
+  opacity: 1;
+}
+
+/* --- iOS "Aggiungi a Home" hint ---------------------------------------------
+   Small dismissible banner (top-centre, clear of the status bar) nudging PWA install for
+   true fullscreen on iPhone. Shown/hidden by src/ui/installHint.js (iOS Safari only). */
+#install-hint {
+  position: fixed;
+  /* Bottom-centre: clear of the menu title/HUD up top, and it sits between the bottom-corner
+     touch controls in gameplay (it also auto-dismisses — see src/ui/installHint.js). */
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100% - 32px));
+  padding: 10px 14px;
+  background: rgba(38, 50, 92, 0.92);
+  color: #fff8f0;
+  border: 1px solid rgba(212, 175, 55, 0.6); /* gold edge */
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  /* Istruzione passo-passo: un sans-serif di sistema è più leggibile del pixel font qui (il
+     resto della UI resta pixel). */
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: center;
+  z-index: 9; /* above the canvas + audio toggles, below the modals (20+) */
+  animation: overlay-in 0.2s ease-out;
+}
+#install-hint[hidden] {
+  display: none;
+}
+.install-text {
+  flex: 1;
+}
+/* Titolo del banner su riga propria, sopra il passo-passo. */
+.install-text strong {
+  display: block;
+  margin-bottom: 2px;
+}
+#install-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 248, 240, 0.18);
+  color: #fff8f0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --- Shared DOM overlays (Insert Coin §1, Receipt §2) -----------------------
+   Full-screen scrim that centres a card over the canvas. Toggled via [hidden]. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 24, 47, 0.8); /* deep-blue scrim over the frozen game */
+  z-index: 20;
+  font-family: "PixelifySans", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  animation: overlay-in 0.18s ease-out;
+}
+.overlay[hidden] {
+  display: none; /* override the display:flex above when hidden */
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.overlay-card {
+  background: #fff8f0;
+  color: #26325c;
+  border-radius: 20px;
+  padding: 32px 28px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  animation: card-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+@keyframes card-pop {
+  from {
+    transform: scale(0.85);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Shared button used inside the cards. */
+.ui-btn {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 14px 26px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #26325c;
+  background: #d4af37; /* royal gold */
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, filter 0.12s ease;
+}
+.ui-btn:hover {
+  filter: brightness(1.06);
+}
+.ui-btn:active {
+  transform: scale(0.95);
+}
+.ui-btn.pay-btn {
+  background: #25d366; /* WhatsApp green */
+  color: #ffffff;
+}
+.ui-btn.ghost-btn {
+  background: transparent;
+  color: #26325c;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* Insert-coin card text. */
+.coin-text {
+  font-size: 22px;
+  line-height: 1.5;
+}
+.coin-text strong {
+  color: #c2410c; /* warm "debt" orange */
+}
+/* Lives line under the insert-coin text. */
+.coin-lives {
+  margin-top: 14px;
+  font-size: 20px;
+  color: #e7969a; /* rose, matching the in-game lives HUD */
+}
+.coin-lives span {
+  font-weight: 700;
+}
+
+/* Game Over card — the only "hard" failure state (out of lives). */
+.gameover-title {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #c2410c;
+  margin-bottom: 12px;
+}
+.gameover-note {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+/* Leaderboard card. Form + invite + ten rows + pager is taller than a landscape phone, so the
+   card scrolls INSIDE itself (the page never does — body is overflow:hidden). */
+.leaderboard-card {
+  max-width: 420px;
+  max-height: calc(100dvh - 48px); /* the .overlay's 24px padding on both sides */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* The finale's invitation headline (submit mode only): this is the closing step of the whole
+   journey, so it gets the warm gold treatment rather than reading as one more form label. */
+.lb-invite {
+  font-size: 21px;
+  line-height: 1.3;
+  color: #d4af37;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.lb-invite[hidden] {
+  display: none;
+}
+.lb-prompt {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.lb-prompt span {
+  color: #d4af37;
+  font-weight: 700;
+}
+#nickname-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 20px;
+  font-family: "PixelifySans", sans-serif;
+  color: #26325c;
+  background: #fff;
+  border: 2px solid #d4af37;
+  border-radius: 12px;
+  text-align: center;
+  outline: none;
+}
+#nickname-input:focus {
+  border-color: #e7969a;
+}
+.lb-list {
+  list-style: none;
+  margin: 18px 0 6px;
+  padding: 0;
+  text-align: left;
+}
+.lb-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 18px;
+}
+.lb-list li:nth-child(odd) {
+  background: rgba(38, 50, 92, 0.06);
+}
+.lb-list li.lb-me {
+  background: rgba(231, 150, 173, 0.28); /* rose tint for the player's own row */
+  font-weight: 700;
+}
+/* NUMBERS COME OUT OF THE PIXEL FONT. PixelifySans is the identity of this UI and .lb-name keeps
+   it — but it exposes no `tnum` feature, so the `font-variant-numeric: tabular-nums` that used to
+   sit on .lb-time did exactly nothing, and its dense digits at 18px were the hardest thing to read
+   in a card whose entire purpose is comparing times. A system monospace lines the columns up on
+   its own. Same exception already made for #install-hint; the rest of the card is untouched. */
+.lb-rank,
+.lb-time,
+.lb-pts,
+.lb-range,
+.lb-prompt span {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.lb-rank {
+  width: 26px;
+  text-align: right;
+  opacity: 0.75; /* 0.6 vanished at 26px wide once the glyphs got thinner */
+}
+.lb-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Time-attack: the classifica ranks by fastest time, so the time is the emphasised column —
+   dark, bold and the BIGGEST thing on the row (it used to be the smallest); the score rides
+   along, dimmer + smaller. Column alignment comes from the monospace family above. */
+.lb-time {
+  color: #26325c;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.lb-pts {
+  color: #d4af37;
+  font-weight: 700;
+  font-size: 15px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+/* Pager — the board is a history (one row per finished run), so it grows past a single screen.
+   Hidden by src/ui/leaderboard.js whenever everything fits on one page. */
+.lb-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+.lb-pager[hidden] {
+  display: none;
+}
+.lb-page-btn {
+  padding: 6px 12px;
+  font-size: 15px;
+  font-family: "PixelifySans", sans-serif;
+  color: #26325c;
+  background: rgba(38, 50, 92, 0.08);
+  border: 1px solid rgba(38, 50, 92, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.lb-page-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.25);
+}
+.lb-page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lb-range {
+  font-size: 15px;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.lb-status {
+  min-height: 22px;
+  font-size: 16px;
+  opacity: 0.8;
+}
+/* Landscape phones are ~430px tall: at the desktop sizes above, the card hits its max-height and
+   the LAST control — the finale's small "Salta" — scrolls out of sight. An escape hatch you have to
+   scroll to find is not an escape hatch, so tighten the whole card (only this card) when the
+   viewport is short, and everything fits without scrolling. */
+@media (max-height: 560px) {
+  .leaderboard-card {
+    padding: 16px 22px;
+  }
+  .leaderboard-card .pause-title {
+    font-size: 22px;
+    margin-bottom: 2px;
+  }
+  .leaderboard-card .lb-invite {
+    font-size: 17px;
+    margin-bottom: 6px;
+  }
+  .leaderboard-card .lb-prompt {
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .leaderboard-card #nickname-input {
+    padding: 8px 12px;
+    font-size: 17px;
+  }
+  .leaderboard-card .ui-btn {
+    margin-top: 8px;
+    padding: 9px 18px;
+    font-size: 17px;
+  }
+  /* Let the LIST scroll, not the card: the pager, the status line and the closing button (which is
+     what hands the finale on to the receipt) must stay on screen, not sink below the fold. */
+  .leaderboard-card .lb-list {
+    margin: 8px 0 4px;
+    max-height: 40vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .leaderboard-card .lb-list li {
+    padding: 4px 8px;
+    font-size: 15px;
+  }
+  /* The row shrinks to 15px; the time must stay the emphasised column through the reduction. */
+  .leaderboard-card .lb-time {
+    font-size: 17px;
+  }
+  .leaderboard-card .lb-status {
+    min-height: 16px;
+    font-size: 14px;
+  }
+}
+
+/* Receipt card — styled like a paper thermal receipt. */
+.receipt-card {
+  max-width: 360px;
+  font-family: "Courier New", Courier, monospace;
+  background: #fffdf7;
+}
+.receipt-head {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+.receipt-sub {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+.receipt-rule {
+  border-top: 2px dashed #26325c;
+  opacity: 0.4;
+  margin: 14px 0;
+}
+.receipt-line {
+  font-size: 15px;
+}
+.receipt-total {
+  font-size: 30px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: #c2410c;
+}
+.receipt-foot {
+  font-size: 14px;
+  opacity: 0.8;
+}
+.receipt-card .ui-btn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+}
+
+/* --- Scene-transition fade ---------------------------------------- */
+#fade {
+  position: fixed;
+  inset: 0;
+  background: #14182f;
+  opacity: 0;
+  pointer-events: none; /* purely visual; never traps input */
+  transition: opacity 0.35s ease;
+  z-index: 30; /* above modals so transitions cover them too */
+}
+#fade.is-visible {
+  opacity: 1;
+}
