@@ -159,6 +159,14 @@
     canvas.dispatchEvent(ev);
   }
 
+  // Lets the Raptor Lounge player forward keyboard controls when the outer
+  // page has focus instead of this iframe.
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!data || !data.raptorFreeDoomKey || !KEYS[data.raptorFreeDoomKey]) return;
+    send(data.type === 'keyup' ? 'keyup' : 'keydown', data.raptorFreeDoomKey);
+  });
+
   function bindHold(el, name) {
     var down = false;
     function press(ev) {
