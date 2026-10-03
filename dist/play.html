@@ -3,5 +3,5 @@ const games={"2048":["2048","games/2048-master/index.html"],tetris:["JavaScript 
 const gameId=new URLSearchParams(location.search).get('game');const selected=games[gameId];if(!selected)location='index.html';else{title.textContent=selected[0];frame.src=selected[1];frame.title=selected[0];document.title=selected[0]+' · Raptor Lounge'}
 const forwardFreeDoomKey=(event,type)=>{if(gameId!=='freedoom')return;const keys=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Control',' '];if(!keys.includes(event.key))return;event.preventDefault();frame.contentWindow.postMessage({raptorFreeDoomKey:event.key===' '?'Space':event.key,type:type},'*')};
 window.addEventListener('keydown',(event)=>forwardFreeDoomKey(event,'keydown'));window.addEventListener('keyup',(event)=>forwardFreeDoomKey(event,'keyup'));
-full.onclick=()=>{const request=stage.requestFullscreen||stage.webkitRequestFullscreen;if(request)request.call(stage)};
+full.onclick=()=>{const target=gameId==='freedoom'?frame:stage;const request=target.requestFullscreen||target.webkitRequestFullscreen;if(request){target.focus();request.call(target)}};
 </script></html>
