@@ -12,10 +12,13 @@
       div.emscripten_border { border: 0; min-height: 72vh; display: grid; place-items: center; background: #000; }
       /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
       canvas.emscripten { border: 0px none; max-width: 100%; width: min(100%, 1100px); height: auto; image-rendering: pixelated; }
+      button { border: 1px solid #a855f7; border-radius: 8px; padding: 9px 14px; background: #6d28d9; color: white; font: 700 14px system-ui, sans-serif; cursor: pointer; }
+      button:hover { background: #8b5cf6; }
     </style>
   </head>
   <body>
-    <p class="emscripten"><strong>FreeDoom</strong> &mdash; click the game, then use the arrow keys to move and Ctrl to fire.</p>
+    <p class="emscripten"><strong>FreeDoom</strong> &mdash; use the arrow keys to move and Ctrl to fire.</p>
+    <p class="emscripten"><button id="newGame" type="button">Start a new game</button> <button id="openMenu" type="button">Open menu</button></p>
     <div class="emscripten" id="status">Downloading...</div>
     <div class="emscripten">
       <progress value="0" max="100" id="progress" hidden=1></progress>  
@@ -167,6 +170,24 @@ function cloneEvent(event) {
     worker.postMessage({ target: 'canvas', event: cloneEvent(event) });
     event.preventDefault();
   }, true);
+});
+
+function sendDoomKey(keyCode) {
+  worker.postMessage({ target: 'document', event: { type: 'keydown', keyCode: keyCode, which: keyCode, charCode: keyCode } });
+  setTimeout(function() {
+    worker.postMessage({ target: 'document', event: { type: 'keyup', keyCode: keyCode, which: keyCode, charCode: keyCode } });
+  }, 45);
+}
+
+document.getElementById('openMenu').addEventListener('click', function() {
+  sendDoomKey(27); // Escape
+});
+
+document.getElementById('newGame').addEventListener('click', function() {
+  // Escape opens the menu; Enter selects New Game and the default difficulty.
+  sendDoomKey(27);
+  setTimeout(function() { sendDoomKey(13); }, 250);
+  setTimeout(function() { sendDoomKey(13); }, 500);
 });
 
 </script>
