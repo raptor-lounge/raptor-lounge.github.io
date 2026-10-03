@@ -5,33 +5,46 @@ import Sokoban from './Sokoban.js'
 const sokoban = new Sokoban({ level: 1 })
 sokoban.render({ restart: true })
 
-// re-render
-document.addEventListener('keydown', (event) => {
+function move(direction) {
   const playerCoords = sokoban.findPlayerCoords()
+
+  sokoban.move(playerCoords, direction)
+  sokoban.render()
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (event) => {
+  let direction
 
   switch (event.key) {
     case keys.up:
     case keys.w:
-      sokoban.move(playerCoords, directions.up)
+      direction = directions.up
       break
     case keys.down:
     case keys.s:
-      sokoban.move(playerCoords, directions.down)
+      direction = directions.down
       break
     case keys.left:
     case keys.a:
-      sokoban.move(playerCoords, directions.left)
+      direction = directions.left
       break
     case keys.right:
     case keys.d:
-      sokoban.move(playerCoords, directions.right)
+      direction = directions.right
       break
     default:
+      return
   }
 
-  sokoban.render()
+  event.preventDefault()
+  move(direction)
 })
 
-document.querySelector('button').addEventListener('click', (event) => {
+document.querySelector('#restart').addEventListener('click', () => {
   sokoban.render({ restart: true })
+})
+
+document.querySelectorAll('[data-direction]').forEach((button) => {
+  button.addEventListener('click', () => move(directions[button.dataset.direction]))
 })

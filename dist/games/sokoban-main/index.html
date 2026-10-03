@@ -9,7 +9,14 @@
     <header>
       <h1>Sokoban</h1>
       <p>Level 1</p>
-      <button>Restart</button>
+      <button id="restart" type="button">Restart</button>
+      <p class="how-to">Move with arrow keys, W-A-S-D, or these buttons.</p>
+      <div class="controls" aria-label="Sokoban movement controls">
+        <button class="move up" type="button" data-direction="up" aria-label="Move up">▲</button>
+        <button class="move left" type="button" data-direction="left" aria-label="Move left">◀</button>
+        <button class="move down" type="button" data-direction="down" aria-label="Move down">▼</button>
+        <button class="move right" type="button" data-direction="right" aria-label="Move right">▶</button>
+      </div>
     </header>
 
     <canvas></canvas>
