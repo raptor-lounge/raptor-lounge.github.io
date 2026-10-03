@@ -190,6 +190,16 @@ document.getElementById('newGame').addEventListener('click', function() {
   setTimeout(function() { sendDoomKey(13); }, 500);
 });
 
+window.addEventListener('message', function(event) {
+  if (!event.data || !event.data.raptorFreeDoom) return;
+  if (event.data.raptorFreeDoom === 'menu') sendDoomKey(27);
+  if (event.data.raptorFreeDoom === 'new') {
+    sendDoomKey(27);
+    setTimeout(function() { sendDoomKey(13); }, 250);
+    setTimeout(function() { sendDoomKey(13); }, 500);
+  }
+});
+
 </script>
   </body>
 </html>
